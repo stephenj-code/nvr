@@ -1,0 +1,62 @@
+mqtt:
+  enabled: false
+
+detectors:
+  default:
+    type: tensorrt
+    device: 0
+
+model:
+  model_type: yolov8
+  path: /config/model/yolov8m.engine
+  width: 640
+  height: 640
+  input_tensor: nchw
+  input_pixel_format: rgb
+
+database:
+  path: /data/frigate.db
+
+ffmpeg:
+  hwaccel_args: preset-jetson-h264
+
+record:
+  enabled: true
+  retain:
+    days: 7
+    mode: all
+  events:
+    retain:
+      default: 14
+      mode: motion
+
+snapshots:
+  enabled: true
+  retain:
+    default: 14
+
+objects:
+  track:
+    - person
+    - car
+    - motorcycle
+    - bus
+    - truck
+
+cameras:
+  front_door:
+    ffmpeg:
+      inputs:
+        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.100/cam/realmonitor?channel=1&subtype=0
+          roles:
+            - record
+        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.100/cam/realmonitor?channel=1&subtype=1
+          roles:
+            - detect
+    detect:
+      width: 704
+      height: 480
+      fps: 5
+    motion:
+      mask:
+        - 0,0,704,50

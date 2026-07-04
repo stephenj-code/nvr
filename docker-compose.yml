@@ -1,0 +1,22 @@
+services:
+  frigate:
+    container_name: frigate
+    image: ghcr.io/blakeblackshear/frigate:stable-tensorrt-jp5
+    runtime: nvidia
+    restart: unless-stopped
+    shm_size: "256mb"
+    environment:
+      TZ: America/New_York
+      FRIGATE_RTSP_USER: ${FRIGATE_RTSP_USER}
+      FRIGATE_RTSP_PASSWORD: ${FRIGATE_RTSP_PASSWORD}
+    ports:
+      - "5000:5000"
+      - "8554:8554"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    volumes:
+      - ./frigate/config.yml:/config/config.yml:ro
+      - /data/frigate/model:/config/model:ro
+      - /data/frigate:/data
+      - /data/frigate/recordings:/media/frigate/recordings
+      - /data/frigate/clips:/media/frigate/clips
