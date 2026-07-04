@@ -49,5 +49,9 @@ spec:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
+        - key: solomon.ai/role
+          operator: Equal
+          value: foundation
+          effect: NoSchedule
       nodeSelector:
         solomon.ai/role: foundation
