@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVR Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; }
+        .header { padding: 1rem 2rem; border-bottom: 1px solid #2f3336; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; font-weight: 600; }
+        .header a { color: #1d9bf0; text-decoration: none; font-size: 0.9rem; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+        .feed-section { background: #16181c; border-radius: 12px; overflow: hidden; }
+        .feed-header { padding: 1rem 1.5rem; border-bottom: 1px solid #2f3336; font-weight: 600; }
+        .feed-container { position: relative; width: 100%; padding-top: 56.25%; background: #000; }
+        .feed-container img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+        .events-section { background: #16181c; border-radius: 12px; max-height: 600px; overflow-y: auto; }
+        .events-header { padding: 1rem 1.5rem; border-bottom: 1px solid #2f3336; font-weight: 600; position: sticky; top: 0; background: #16181c; z-index: 1; }
+        .event-item { padding: 0.75rem 1.5rem; border-bottom: 1px solid #2f3336; display: flex; justify-content: space-between; align-items: center; }
+        .event-item:hover { background: #1c1f23; }
+        .event-label { font-weight: 500; text-transform: capitalize; }
+        .event-time { color: #71767b; font-size: 0.85rem; }
+        .event-camera { color: #1d9bf0; font-size: 0.85rem; }
+        .stats-bar { display: flex; gap: 2rem; padding: 1rem 2rem; background: #16181c; border-radius: 12px; margin-bottom: 2rem; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 1.5rem; font-weight: 700; color: #1d9bf0; }
+        .stat-label { font-size: 0.8rem; color: #71767b; margin-top: 0.25rem; }
+        .no-events { padding: 2rem; text-align: center; color: #71767b; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>NVR Dashboard</h1>
+        <a href="/frigate/" target="_blank">Frigate UI</a>
+    </div>
+    <div class="container">
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat"><div class="stat-value" id="stat-uptime">--</div><div class="stat-label">Uptime</div></div>
+            <div class="stat"><div class="stat-value" id="stat-fps">--</div><div class="stat-label">Detection FPS</div></div>
+            <div class="stat"><div class="stat-value" id="stat-inference">--</div><div class="stat-label">Inference ms</div></div>
+            <div class="stat"><div class="stat-value" id="stat-events">--</div><div class="stat-label">Events Today</div></div>
+        </div>
+        <div class="grid">
+            <div class="feed-section">
+                <div class="feed-header">Front Door - Live</div>
+                <div class="feed-container">
+                    <img id="live-feed" src="/stream/front_door" alt="Live Feed">
+                </div>
+            </div>
+            <div class="events-section">
+                <div class="events-header">Recent Events</div>
+                <div id="events-list"><div class="no-events">Loading...</div></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const feedImg = document.getElementById('live-feed');
+        setInterval(() => {
+            feedImg.src = '/stream/front_door?' + Date.now();
+        }, 1000);
+
+        async function loadEvents() {
+            try {
+                const resp = await fetch('/api/events?limit=20');
+                const events = await resp.json();
+                const list = document.getElementById('events-list');
+                if (!events.length) { list.innerHTML = '<div class="no-events">No events yet</div>'; return; }
+                list.innerHTML = events.map(e => `
+                    <div class="event-item">
+                        <div>
+                            <div class="event-label">${e.label}</div>
+                            <div class="event-camera">${e.camera}</div>
+                        </div>
+                        <div class="event-time">${new Date(e.start_time * 1000).toLocaleTimeString()}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                document.getElementById('events-list').innerHTML = '<div class="no-events">Frigate unavailable</div>';
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const resp = await fetch('/api/stats');
+                const stats = await resp.json();
+                const cam = stats.cameras?.front_door;
+                if (cam) {
+                    document.getElementById('stat-fps').textContent = cam.detection_fps?.toFixed(1) || '--';
+                }
+                const det = stats.detectors?.default;
+                if (det) {
+                    document.getElementById('stat-inference').textContent = det.inference_speed?.toFixed(1) || '--';
+                }
+                if (stats.service?.uptime) {
+                    const hrs = Math.floor(stats.service.uptime / 3600);
+                    document.getElementById('stat-uptime').textContent = hrs + 'h';
+                }
+            } catch (err) {}
+        }
+
+        loadEvents();
+        loadStats();
+        setInterval(loadEvents, 10000);
+        setInterval(loadStats, 5000);
+    </script>
+</body>
+</html>
