@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nvr-dashboard
+  namespace: nvr
+  labels:
+    app: nvr-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nvr-dashboard
+  template:
+    metadata:
+      labels:
+        app: nvr-dashboard
+    spec:
+      containers:
+        - name: nvr-dashboard
+          image: nvr-dashboard:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: FRIGATE_URL
+              value: "http://192.168.1.49:5000"
+            - name: TZ
+              value: America/New_York
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        solomon.ai/role: foundation

@@ -1,0 +1,121 @@
+---
+# OAuth2-Proxy in front of NVR Dashboard
+# Enforces Keycloak SSO with nvr-access role.
+#
+# Secret (gitignored, apply manually):
+#   kubectl create secret generic nvr-oauth2-proxy-secret -n nvr \
+#     --from-literal=client-secret=<infra-apps-keycloak-client-secret> \
+#     --from-literal=cookie-secret=$(openssl rand -base64 32 | tr -d '\n')
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nvr-oauth2-proxy
+  namespace: nvr
+  labels:
+    app: nvr-oauth2-proxy
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nvr-oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: nvr-oauth2-proxy
+    spec:
+      nodeSelector:
+        solomon.ai/role: foundation
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: wait-for-keycloak
+          image: curlimages/curl:8.11.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until curl -sf --max-time 5 https://keycloak.project-solomon.ai/realms/solomon/.well-known/openid-configuration > /dev/null; do
+                echo "Waiting for Keycloak OIDC..."; sleep 5
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+          args:
+            - --provider=keycloak-oidc
+            - --oidc-issuer-url=https://keycloak.project-solomon.ai/realms/solomon
+            - --client-id=infra-apps
+            - --upstream=http://nvr-dashboard.nvr.svc.cluster.local:8000
+            - --http-address=0.0.0.0:4180
+            - --redirect-url=https://nvr.project-solomon.ai/oauth2/callback
+            - --email-domain=*
+            - --scope=openid email profile
+            - --allowed-role=infra-apps:nvr-access
+            - --set-xauthrequest=true
+            - --pass-access-token=false
+            - --skip-provider-button=true
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            - --cookie-name=_oauth2_nvr
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nvr-oauth2-proxy-secret
+                  key: client-secret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nvr-oauth2-proxy-secret
+                  key: cookie-secret
+          ports:
+            - name: http
+              containerPort: 4180
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nvr-oauth2-proxy
+  namespace: nvr
+  labels:
+    app: nvr-oauth2-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: nvr-oauth2-proxy
+  ports:
+    - name: http
+      port: 4180
+      targetPort: 4180
