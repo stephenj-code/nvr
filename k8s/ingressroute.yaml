@@ -10,6 +10,6 @@ spec:
     - match: Host(`nvr.project-solomon.ai`)
       kind: Rule
       services:
-        - name: nvr-oauth2-proxy
+        - name: nvr-dashboard
           namespace: nvr
-          port: 4180
+          port: 8000

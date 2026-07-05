@@ -26,6 +26,22 @@ spec:
               value: "http://192.168.1.49:5000"
             - name: TZ
               value: America/New_York
+            - name: APP_URL
+              value: "https://nvr.project-solomon.ai"
+            - name: KEYCLOAK_ISSUER
+              value: "https://keycloak.project-solomon.ai/realms/solomon"
+            - name: OIDC_CLIENT_ID
+              value: "infra-apps"
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nvr-oidc-secret
+                  key: client-secret
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nvr-oidc-secret
+                  key: session-secret
           resources:
             requests:
               cpu: 100m
