@@ -27,9 +27,40 @@ if not SESSION_SECRET:
 
 logger = logging.getLogger("nvr")
 
+
+def get_user(request: Request) -> dict | None:
+    return request.session.get("user")
+
+
+def get_roles(request: Request) -> list:
+    return request.session.get("roles", [])
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        public_paths = ("/health", "/auth/", "/static/")
+        if any(request.url.path.startswith(p) for p in public_paths):
+            return await call_next(request)
+
+        user = get_user(request)
+        if not user:
+            request.session["return_to"] = str(request.url.path)
+            return RedirectResponse(url="/auth/login")
+
+        roles = get_roles(request)
+        if REQUIRED_ROLE not in roles:
+            return HTMLResponse(
+                "<html><body style='font-family:sans-serif;text-align:center;padding:4rem'>"
+                "<h2>Access Denied</h2>"
+                f"<p>Your account does not have the <strong>{REQUIRED_ROLE}</strong> role.</p>"
+                "<a href='/auth/logout'>Sign out</a></body></html>",
+                status_code=403,
+            )
+
+        return await call_next(request)
+
+
 app = FastAPI(title="NVR Dashboard")
-# Middleware runs in reverse registration order — AuthMiddleware registered first
-# so it runs INSIDE (after) SessionMiddleware
 app.add_middleware(AuthMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, session_cookie="nvr-session",
                    max_age=8 * 60 * 60, https_only=True, same_site="lax")
@@ -57,14 +88,6 @@ def decode_jwt_payload(token: str) -> dict:
         return json.loads(base64.urlsafe_b64decode(payload))
     except Exception:
         return {}
-
-
-def get_user(request: Request) -> dict | None:
-    return request.session.get("user")
-
-
-def get_roles(request: Request) -> list:
-    return request.session.get("roles", [])
 
 
 # ── Auth routes (public) ────────────────────────────────────────────────────
@@ -132,32 +155,6 @@ async def me(request: Request):
     if not user:
         return JSONResponse({"authenticated": False}, status_code=401)
     return {"authenticated": True, "user": user}
-
-
-# ── Auth middleware ──────────────────────────────────────────────────────────
-
-class AuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        public_paths = ("/health", "/auth/", "/static/")
-        if any(request.url.path.startswith(p) for p in public_paths):
-            return await call_next(request)
-
-        user = get_user(request)
-        if not user:
-            request.session["return_to"] = str(request.url.path)
-            return RedirectResponse(url="/auth/login")
-
-        roles = get_roles(request)
-        if REQUIRED_ROLE not in roles:
-            return HTMLResponse(
-                "<html><body style='font-family:sans-serif;text-align:center;padding:4rem'>"
-                "<h2>Access Denied</h2>"
-                f"<p>Your account does not have the <strong>{REQUIRED_ROLE}</strong> role.</p>"
-                "<a href='/auth/logout'>Sign out</a></body></html>",
-                status_code=403,
-            )
-
-        return await call_next(request)
 
 
 # ── App routes (protected by middleware) ─────────────────────────────────────
