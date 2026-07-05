@@ -5,6 +5,7 @@ import logging
 
 import httpx
 from authlib.integrations.starlette_client import OAuth
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
@@ -27,6 +28,9 @@ if not SESSION_SECRET:
 logger = logging.getLogger("nvr")
 
 app = FastAPI(title="NVR Dashboard")
+# Middleware runs in reverse registration order — AuthMiddleware registered first
+# so it runs INSIDE (after) SessionMiddleware
+app.add_middleware(AuthMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, session_cookie="nvr-session",
                    max_age=8 * 60 * 60, https_only=True, same_site="lax")
 
@@ -132,28 +136,28 @@ async def me(request: Request):
 
 # ── Auth middleware ──────────────────────────────────────────────────────────
 
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    public_paths = ("/health", "/auth/")
-    if any(request.url.path.startswith(p) for p in public_paths):
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        public_paths = ("/health", "/auth/", "/static/")
+        if any(request.url.path.startswith(p) for p in public_paths):
+            return await call_next(request)
+
+        user = get_user(request)
+        if not user:
+            request.session["return_to"] = str(request.url.path)
+            return RedirectResponse(url="/auth/login")
+
+        roles = get_roles(request)
+        if REQUIRED_ROLE not in roles:
+            return HTMLResponse(
+                "<html><body style='font-family:sans-serif;text-align:center;padding:4rem'>"
+                "<h2>Access Denied</h2>"
+                f"<p>Your account does not have the <strong>{REQUIRED_ROLE}</strong> role.</p>"
+                "<a href='/auth/logout'>Sign out</a></body></html>",
+                status_code=403,
+            )
+
         return await call_next(request)
-
-    user = get_user(request)
-    if not user:
-        request.session["return_to"] = str(request.url.path)
-        return RedirectResponse(url="/auth/login")
-
-    roles = get_roles(request)
-    if REQUIRED_ROLE not in roles:
-        return HTMLResponse(
-            "<html><body style='font-family:sans-serif;text-align:center;padding:4rem'>"
-            "<h2>Access Denied</h2>"
-            f"<p>Your account does not have the <strong>{REQUIRED_ROLE}</strong> role.</p>"
-            "<a href='/auth/logout'>Sign out</a></body></html>",
-            status_code=403,
-        )
-
-    return await call_next(request)
 
 
 # ── App routes (protected by middleware) ─────────────────────────────────────
