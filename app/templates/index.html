@@ -34,7 +34,13 @@
 <body>
     <div class="header">
         <h1>NVR Dashboard</h1>
-        <a href="/frigate/" target="_blank">Frigate UI</a>
+        <div style="display:flex;align-items:center;gap:1.5rem">
+            <a href="/frigate/" target="_blank">Frigate UI</a>
+            <span id="user-info" style="display:none;font-size:0.9rem;color:#71767b">
+                <span id="user-name"></span>
+                <a href="/auth/logout" style="color:#71767b;margin-left:0.75rem" title="Sign out">&#x23FB;</a>
+            </span>
+        </div>
     </div>
     <div class="container">
         <div class="stats-bar" id="stats-bar">
@@ -101,6 +107,18 @@
             } catch (err) {}
         }
 
+        async function loadUser() {
+            try {
+                const resp = await fetch('/auth/me');
+                const data = await resp.json();
+                if (data.authenticated) {
+                    document.getElementById('user-name').textContent = data.user.name || data.user.email;
+                    document.getElementById('user-info').style.display = 'inline';
+                }
+            } catch (err) {}
+        }
+
+        loadUser();
         loadEvents();
         loadStats();
         setInterval(loadEvents, 10000);
