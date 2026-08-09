@@ -59,8 +59,8 @@ objects:
       min_score: 0.5
       threshold: 0.7
     dog:
-      min_score: 0.5
-      threshold: 0.7
+      min_score: 0.4
+      threshold: 0.6
     bird:
       min_score: 0.5
       threshold: 0.7
