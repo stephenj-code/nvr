@@ -1,18 +1,24 @@
 mqtt:
   enabled: false
 
+go2rtc:
+  streams:
+    front_door:
+      - rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.45/cam/realmonitor?channel=1&subtype=0
+    front_door_sub:
+      - rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.45/cam/realmonitor?channel=1&subtype=1
+
 detectors:
   default:
     type: tensorrt
     device: 0
 
 model:
-  model_type: yolo-generic
   path: /config/model/yolov8m.engine
-  width: 640
-  height: 640
   input_tensor: nchw
   input_pixel_format: rgb
+  width: 640
+  height: 640
 
 database:
   path: /data/frigate.db
@@ -22,13 +28,16 @@ ffmpeg:
 
 record:
   enabled: true
-  retain:
-    days: 7
-    mode: all
-  events:
+  alerts:
     retain:
-      default: 14
-      mode: motion
+      days: 14
+  detections:
+    retain:
+      days: 14
+  continuous:
+    days: 7
+  motion:
+    days: 7
 
 snapshots:
   enabled: true
@@ -42,15 +51,34 @@ objects:
     - motorcycle
     - bus
     - truck
+    - cat
+    - dog
+    - bird
+  filters:
+    cat:
+      min_score: 0.5
+      threshold: 0.7
+    dog:
+      min_score: 0.5
+      threshold: 0.7
+    bird:
+      min_score: 0.5
+      threshold: 0.7
+      min_area: 1500  # ignore tiny/distant birds
 
 cameras:
   front_door:
+    live:
+      streams:
+        front_door: front_door
     ffmpeg:
       inputs:
-        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.45/cam/realmonitor?channel=1&subtype=0
+        - path: rtsp://127.0.0.1:8554/front_door
+          input_args: preset-rtsp-restream
           roles:
             - record
-        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.45/cam/realmonitor?channel=1&subtype=1
+        - path: rtsp://127.0.0.1:8554/front_door_sub
+          input_args: preset-rtsp-restream
           roles:
             - detect
     detect:
@@ -61,3 +89,38 @@ cameras:
     motion:
       mask:
         - 0,0,704,50
+
+classification:
+  custom:
+    Hunter:
+      enabled: true
+      name: Hunter
+      threshold: 0.8
+      object_config:
+        objects:
+          - person
+        classification_type: sub_label
+    Dalen:
+      enabled: true
+      name: Dalen
+      threshold: 0.8
+      object_config:
+        objects:
+          - person
+        classification_type: sub_label
+    Kutti-kitty:
+      enabled: true
+      name: Kutti-kitty
+      threshold: 0.8
+      object_config:
+        objects:
+          - person
+        classification_type: sub_label
+    Stephen:
+      enabled: true
+      name: Stephen
+      threshold: 0.8
+      object_config:
+        objects:
+          - person
+        classification_type: sub_label
