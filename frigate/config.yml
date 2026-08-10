@@ -113,6 +113,10 @@ cameras:
       width: 704
       height: 480
       fps: 5
+    motion:
+      mask:
+        - 0,0,704,50      # timestamp overlay (top-right)
+        - 0,440,80,480    # IPC label (bottom-left)
 
 classification:
   custom:
