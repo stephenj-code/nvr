@@ -3,10 +3,14 @@ mqtt:
 
 go2rtc:
   streams:
-    front_door:
+    front-west:
       - rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.45/cam/realmonitor?channel=1&subtype=0
-    front_door_sub:
+    front-west-sub:
       - rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.45/cam/realmonitor?channel=1&subtype=1
+    front-east:
+      - rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.232/cam/realmonitor?channel=1&subtype=0
+    front-east-sub:
+      - rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@192.168.1.232/cam/realmonitor?channel=1&subtype=1
 
 detectors:
   default:
@@ -67,17 +71,17 @@ objects:
       min_area: 1500  # ignore tiny/distant birds
 
 cameras:
-  front_door:
+  front-west:
     live:
       streams:
-        front_door: front_door
+        front-west: front-west
     ffmpeg:
       inputs:
-        - path: rtsp://127.0.0.1:8554/front_door
+        - path: rtsp://127.0.0.1:8554/front-west
           input_args: preset-rtsp-restream
           roles:
             - record
-        - path: rtsp://127.0.0.1:8554/front_door_sub
+        - path: rtsp://127.0.0.1:8554/front-west-sub
           input_args: preset-rtsp-restream
           roles:
             - detect
@@ -89,6 +93,26 @@ cameras:
     motion:
       mask:
         - 0,0,704,50
+
+  front-east:
+    live:
+      streams:
+        front-east: front-east
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front-east
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/front-east-sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 704
+      height: 480
+      fps: 5
 
 classification:
   custom:
