@@ -34,10 +34,6 @@
             padding: 2px 8px; border-radius: 3px; z-index: 2; letter-spacing: 0.5px;
         }
         .camera-feed { width: 100%; height: 100%; object-fit: contain; display: block; }
-        .camera-error {
-            color: #444; font-size: 13px; text-align: center; padding: 20px;
-            display: none; position: absolute;
-        }
 
         .events-section {
             background: #161616; border-top: 1px solid #242424;
@@ -82,17 +78,11 @@
 <div class="cameras">
     <div class="camera-panel">
         <span class="camera-label">Front West</span>
-        <img id="cam-west" class="camera-feed"
-             src="/mjpeg/front-west" alt="Front West"
-             onerror="handleStreamError('cam-west', 'front-west')" />
-        <div id="err-west" class="camera-error">Stream unavailable</div>
+        <img id="cam-west" class="camera-feed" alt="Front West" />
     </div>
     <div class="camera-panel">
         <span class="camera-label">Front East</span>
-        <img id="cam-east" class="camera-feed"
-             src="/mjpeg/front-east" alt="Front East"
-             onerror="handleStreamError('cam-east', 'front-east')" />
-        <div id="err-east" class="camera-error">Stream unavailable</div>
+        <img id="cam-east" class="camera-feed" alt="Front East" />
     </div>
 </div>
 
@@ -104,22 +94,31 @@
 </div>
 
 <script>
-    const streamErrors = {};
+    // JPEG polling — fetches a fresh frame every INTERVAL ms.
+    // No streaming connection, no proxy buffering, near-zero latency.
+    const POLL_INTERVAL = 200; // ms — ~5 fps
 
-    function handleStreamError(imgId, streamName) {
+    function startCamera(imgId, streamName) {
         const img = document.getElementById(imgId);
-        const errId = imgId.replace('cam-', 'err-');
-        const errEl = document.getElementById(errId);
-        img.style.display = 'none';
-        errEl.style.display = 'block';
-        // Retry after 5s
-        if (!streamErrors[imgId]) {
-            streamErrors[imgId] = setInterval(() => {
-                img.src = '/mjpeg/' + streamName + '?t=' + Date.now();
-                img.style.display = '';
-                errEl.style.display = 'none';
-            }, 5000);
+        let pending = false;
+
+        function fetchFrame() {
+            if (pending) return; // skip if previous frame not yet delivered
+            pending = true;
+            const next = new Image();
+            next.onload = () => {
+                img.src = next.src;
+                pending = false;
+            };
+            next.onerror = () => {
+                pending = false; // retry next tick
+            };
+            next.src = '/live/' + streamName + '?t=' + Date.now();
         }
+
+        // Prime with first frame immediately
+        fetchFrame();
+        setInterval(fetchFrame, POLL_INTERVAL);
     }
 
     async function loadEvents() {
@@ -152,8 +151,8 @@
             const s = await resp.json();
             const w = s.cameras?.['front-west'];
             const e = s.cameras?.['front-east'];
-            if (w) document.getElementById('fps-west').textContent = (w.detection_fps ?? '--');
-            if (e) document.getElementById('fps-east').textContent = (e.detection_fps ?? '--');
+            if (w) document.getElementById('fps-west').textContent = w.detection_fps ?? '--';
+            if (e) document.getElementById('fps-east').textContent = e.detection_fps ?? '--';
             if (s.service?.uptime) {
                 const h = Math.floor(s.service.uptime / 3600);
                 const m = Math.floor((s.service.uptime % 3600) / 60);
@@ -173,6 +172,8 @@
         } catch (_) {}
     }
 
+    startCamera('cam-west', 'front-west');
+    startCamera('cam-east', 'front-east');
     loadUser();
     loadEvents();
     loadStats();
