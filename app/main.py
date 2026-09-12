@@ -2,12 +2,14 @@ import os
 import json
 import base64
 import logging
+import asyncio
 
 import httpx
+import websockets
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -38,7 +40,7 @@ def get_roles(request: Request) -> list:
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        public_paths = ("/health", "/auth/", "/static/")
+        public_paths = ("/health", "/auth/", "/static/", "/ws/")
         if any(request.url.path.startswith(p) for p in public_paths):
             return await call_next(request)
 
@@ -134,19 +136,13 @@ async def callback(request: Request):
 
 @app.get("/auth/logout")
 async def logout(request: Request):
-    id_token = request.session.get("id_token", "")
     email = request.session.get("user", {}).get("email", "")
     request.session.clear()
     logger.info("User logged out: %s", email)
-    if id_token:
-        # Redirect to Keycloak end_session to terminate SSO session
-        meta = await oauth.keycloak.load_server_metadata()
-        end_session_url = meta.get("end_session_endpoint", "")
-        if end_session_url:
-            return RedirectResponse(
-                url=f"{end_session_url}?id_token_hint={id_token}&post_logout_redirect_uri={APP_URL}"
-            )
-    return RedirectResponse(url="/")
+    response = RedirectResponse(url="/auth/login")
+    # Explicitly expire the session cookie so the browser discards it
+    response.delete_cookie("nvr-session", path="/", secure=True, httponly=True, samesite="lax")
+    return response
 
 
 @app.get("/auth/me")
@@ -197,6 +193,24 @@ async def stream(camera_name: str):
     return StreamingResponse(proxy_stream(), media_type="image/jpeg")
 
 
+GO2RTC_URL = FRIGATE_URL.replace(":5000", ":1984")
+
+
+@app.get("/live/{stream_name}")
+async def live_frame(stream_name: str, width: int = 1280):
+    """Proxy go2rtc JPEG frame, downscaled for fast delivery."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{GO2RTC_URL}/api/frame.jpeg?src={stream_name}&width={width}",
+            timeout=10.0,
+        )
+        return StreamingResponse(
+            iter([resp.content]),
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+
 @app.get("/mjpeg/{camera_name}")
 async def mjpeg(camera_name: str):
     async def proxy_mjpeg():
@@ -240,6 +254,50 @@ async def frigate_proxy(request: Request, path: str):
             headers=dict(resp.headers),
             media_type=resp.headers.get("content-type"),
         )
+
+
+@app.websocket("/ws/go2rtc")
+async def go2rtc_ws_proxy(ws: WebSocket, src: str = "front_door"):
+    """Proxy WebSocket connection to go2rtc for MSE live streaming."""
+    await ws.accept()
+    go2rtc_ws_url = f"ws://{GO2RTC_URL.split('://')[-1]}/api/ws?src={src}"
+    try:
+        async with websockets.connect(go2rtc_ws_url) as go2rtc:
+            async def browser_to_go2rtc():
+                try:
+                    while True:
+                        msg = await ws.receive()
+                        if "text" in msg:
+                            await go2rtc.send(msg["text"])
+                        elif "bytes" in msg:
+                            await go2rtc.send(msg["bytes"])
+                except Exception:
+                    pass
+
+            async def go2rtc_to_browser():
+                try:
+                    async for msg in go2rtc:
+                        if isinstance(msg, bytes):
+                            await ws.send_bytes(msg)
+                        else:
+                            await ws.send_text(msg)
+                except Exception:
+                    pass
+
+            done, pending = await asyncio.wait(
+                [asyncio.create_task(browser_to_go2rtc()),
+                 asyncio.create_task(go2rtc_to_browser())],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+    except Exception as e:
+        logger.warning("go2rtc WebSocket proxy error: %s", e)
+    finally:
+        try:
+            await ws.close()
+        except Exception:
+            pass
 
 
 @app.get("/health")
