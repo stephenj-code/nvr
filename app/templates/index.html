@@ -83,14 +83,14 @@
     <div class="camera-panel">
         <span class="camera-label">Front West</span>
         <img id="cam-west" class="camera-feed"
-             src="/live-mjpeg/front-west" alt="Front West"
+             src="/mjpeg/front-west" alt="Front West"
              onerror="handleStreamError('cam-west', 'front-west')" />
         <div id="err-west" class="camera-error">Stream unavailable</div>
     </div>
     <div class="camera-panel">
         <span class="camera-label">Front East</span>
         <img id="cam-east" class="camera-feed"
-             src="/live-mjpeg/front-east" alt="Front East"
+             src="/mjpeg/front-east" alt="Front East"
              onerror="handleStreamError('cam-east', 'front-east')" />
         <div id="err-east" class="camera-error">Stream unavailable</div>
     </div>
@@ -115,7 +115,7 @@
         // Retry after 5s
         if (!streamErrors[imgId]) {
             streamErrors[imgId] = setInterval(() => {
-                img.src = '/live-mjpeg/' + streamName + '?t=' + Date.now();
+                img.src = '/mjpeg/' + streamName + '?t=' + Date.now();
                 img.style.display = '';
                 errEl.style.display = 'none';
             }, 5000);
