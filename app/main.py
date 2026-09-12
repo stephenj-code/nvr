@@ -211,6 +211,27 @@ async def live_frame(stream_name: str, width: int = 1280):
         )
 
 
+
+
+@app.get("/live-mjpeg/{stream_name}")
+async def live_mjpeg(stream_name: str):
+    """Proxy go2rtc MJPEG stream for continuous live video."""
+    async def proxy_go2rtc_mjpeg():
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                "GET",
+                f"{GO2RTC_URL}/api/stream.mjpeg?src={stream_name}",
+                timeout=None,
+            ) as resp:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+
+    return StreamingResponse(
+        proxy_go2rtc_mjpeg(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 @app.get("/mjpeg/{camera_name}")
 async def mjpeg(camera_name: str):
     async def proxy_mjpeg():

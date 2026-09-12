@@ -3,241 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NVR Dashboard</title>
+    <title>NVR</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; }
-        .header { padding: 1rem 2rem; border-bottom: 1px solid #2f3336; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.4rem; font-weight: 600; }
-        .header a { color: #1d9bf0; text-decoration: none; font-size: 0.9rem; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
-        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
-        .feed-section { background: #16181c; border-radius: 12px; overflow: hidden; }
-        .feed-header { padding: 1rem 1.5rem; border-bottom: 1px solid #2f3336; font-weight: 600; }
-        .feed-container { position: relative; width: 100%; padding-top: 56.25%; background: #000; }
-        .feed-container img, .feed-container video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
-        .feed-toggle { display: flex; gap: 0.5rem; }
-        .feed-toggle button { background: #1c1f23; color: #e7e9ea; border: 1px solid #2f3336; border-radius: 4px; padding: 0.3rem 0.6rem; font-size: 0.75rem; cursor: pointer; }
-        .feed-toggle button.active { background: #1d9bf0; border-color: #1d9bf0; }
-        .events-section { background: #16181c; border-radius: 12px; max-height: 600px; overflow-y: auto; }
-        .events-header { padding: 1rem 1.5rem; border-bottom: 1px solid #2f3336; font-weight: 600; position: sticky; top: 0; background: #16181c; z-index: 1; }
-        .event-item { padding: 0.75rem 1.5rem; border-bottom: 1px solid #2f3336; display: flex; justify-content: space-between; align-items: center; }
-        .event-item:hover { background: #1c1f23; }
-        .event-label { font-weight: 500; text-transform: capitalize; }
-        .event-time { color: #71767b; font-size: 0.85rem; }
-        .event-camera { color: #1d9bf0; font-size: 0.85rem; }
-        .stats-bar { display: flex; gap: 2rem; padding: 1rem 2rem; background: #16181c; border-radius: 12px; margin-bottom: 2rem; }
-        .stat { text-align: center; }
-        .stat-value { font-size: 1.5rem; font-weight: 700; color: #1d9bf0; }
-        .stat-label { font-size: 0.8rem; color: #71767b; margin-top: 0.25rem; }
-        .no-events { padding: 2rem; text-align: center; color: #71767b; }
-        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f0f0f; color: #e0e0e0; font-family: system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 16px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 16px; font-weight: 700; letter-spacing: 3px; color: #fff; }
+        .stats-bar { display: flex; gap: 18px; font-size: 12px; color: #666; }
+        .stat-val { color: #ccc; font-weight: 500; }
+        .user-info { font-size: 12px; color: #555; }
+        .user-info a { color: #444; text-decoration: none; margin-left: 8px; }
+        .user-info a:hover { color: #888; }
+
+        .cameras {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+            padding: 6px; flex: 1; min-height: 0;
+        }
+        .camera-panel {
+            position: relative; background: #000; border-radius: 4px;
+            overflow: hidden; display: flex; align-items: center; justify-content: center;
+        }
+        .camera-label {
+            position: absolute; top: 8px; left: 8px;
+            background: rgba(0,0,0,0.65); color: #ddd; font-size: 11px;
+            padding: 2px 8px; border-radius: 3px; z-index: 2; letter-spacing: 0.5px;
+        }
+        .camera-feed { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .camera-error {
+            color: #444; font-size: 13px; text-align: center; padding: 20px;
+            display: none; position: absolute;
+        }
+
+        .events-section {
+            background: #161616; border-top: 1px solid #242424;
+            padding: 6px 14px 8px; max-height: 160px; overflow-y: auto; flex-shrink: 0;
+        }
+        .events-header {
+            font-size: 10px; font-weight: 600; color: #555;
+            text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;
+        }
+        .events-list { display: flex; flex-wrap: wrap; gap: 5px; }
+        .event-item {
+            background: #202020; border-radius: 3px; padding: 3px 10px;
+            font-size: 11px; display: flex; align-items: center; gap: 7px;
+        }
+        .ev-label { color: #ddd; font-weight: 500; }
+        .ev-score { color: #5a9; }
+        .ev-cam { color: #555; }
+        .ev-time { color: #444; }
+        .no-events { color: #444; font-size: 12px; }
+
+        @media (max-width: 640px) {
+            .cameras { grid-template-columns: 1fr; }
+            .stats-bar { display: none; }
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>NVR Dashboard</h1>
-        <div style="display:flex;align-items:center;gap:1.5rem">
-            <a href="/frigate/" target="_blank">Frigate UI</a>
-            <span id="user-info" style="display:none;font-size:0.9rem;color:#71767b">
-                <span id="user-name"></span>
-                <a href="/auth/logout" style="color:#71767b;margin-left:0.75rem" title="Sign out">&#x23FB;</a>
-            </span>
-        </div>
+
+<div class="header">
+    <h1>NVR</h1>
+    <div class="stats-bar">
+        <span>W: <span class="stat-val" id="fps-west">--</span> fps</span>
+        <span>E: <span class="stat-val" id="fps-east">--</span> fps</span>
+        <span>up <span class="stat-val" id="uptime">--</span></span>
+        <span><span class="stat-val" id="ev-count">0</span> events</span>
     </div>
-    <div class="container">
-        <div class="stats-bar" id="stats-bar">
-            <div class="stat"><div class="stat-value" id="stat-uptime">--</div><div class="stat-label">Uptime</div></div>
-            <div class="stat"><div class="stat-value" id="stat-fps">--</div><div class="stat-label">Detection FPS</div></div>
-            <div class="stat"><div class="stat-value" id="stat-inference">--</div><div class="stat-label">Inference ms</div></div>
-            <div class="stat"><div class="stat-value" id="stat-events">--</div><div class="stat-label">Events Today</div></div>
-        </div>
-        <div class="grid">
-            <div class="feed-section">
-                <div class="feed-header" style="display:flex;justify-content:space-between;align-items:center">
-                    <span>Front Door - Live</span>
-                    <div class="feed-toggle">
-                        <button id="btn-live" class="active" onclick="switchFeed('live')">HD Live</button>
-                        <button id="btn-detect" onclick="switchFeed('detect')">Detect</button>
-                    </div>
-                </div>
-                <div class="feed-container">
-                    <video id="live-video" autoplay muted playsinline controls style="display:none"></video>
-                    <img id="live-feed" alt="Live Feed">
-                </div>
-            </div>
-            <div class="events-section">
-                <div class="events-header">Recent Events</div>
-                <div id="events-list"><div class="no-events">Loading...</div></div>
-            </div>
-        </div>
+    <div class="user-info" id="user-info" style="display:none">
+        <span id="user-name"></span><a href="/auth/logout">sign out</a>
     </div>
-    <script>
-        const feedImg = document.getElementById('live-feed');
-        const feedVideo = document.getElementById('live-video');
-        let detectInterval = null;
-        let mseWs = null;
-        let mseSource = null;
-        let mseBuffer = null;
-        let mseQueue = [];
-        let mseAppending = false;
+</div>
 
-        function stopMSE() {
-            if (mseWs) { try { mseWs.close(); } catch(e) {} mseWs = null; }
-            mseBuffer = null;
-            mseQueue = [];
-            mseAppending = false;
-            if (mseSource && mseSource.readyState === 'open') {
-                try { mseSource.endOfStream(); } catch(e) {}
+<div class="cameras">
+    <div class="camera-panel">
+        <span class="camera-label">Front West</span>
+        <img id="cam-west" class="camera-feed"
+             src="/live-mjpeg/front-west" alt="Front West"
+             onerror="handleStreamError('cam-west', 'front-west')" />
+        <div id="err-west" class="camera-error">Stream unavailable</div>
+    </div>
+    <div class="camera-panel">
+        <span class="camera-label">Front East</span>
+        <img id="cam-east" class="camera-feed"
+             src="/live-mjpeg/front-east" alt="Front East"
+             onerror="handleStreamError('cam-east', 'front-east')" />
+        <div id="err-east" class="camera-error">Stream unavailable</div>
+    </div>
+</div>
+
+<div class="events-section">
+    <div class="events-header">Recent Detections</div>
+    <div class="events-list" id="events-list">
+        <span class="no-events">Loading&hellip;</span>
+    </div>
+</div>
+
+<script>
+    const streamErrors = {};
+
+    function handleStreamError(imgId, streamName) {
+        const img = document.getElementById(imgId);
+        const errId = imgId.replace('cam-', 'err-');
+        const errEl = document.getElementById(errId);
+        img.style.display = 'none';
+        errEl.style.display = 'block';
+        // Retry after 5s
+        if (!streamErrors[imgId]) {
+            streamErrors[imgId] = setInterval(() => {
+                img.src = '/live-mjpeg/' + streamName + '?t=' + Date.now();
+                img.style.display = '';
+                errEl.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    async function loadEvents() {
+        try {
+            const resp = await fetch('/api/events?limit=30');
+            if (!resp.ok) throw new Error(resp.status);
+            const events = await resp.json();
+            document.getElementById('ev-count').textContent = events.length;
+            const list = document.getElementById('events-list');
+            if (!events.length) {
+                list.innerHTML = '<span class="no-events">No detections yet</span>';
+                return;
             }
-            mseSource = null;
-            feedVideo.src = '';
+            list.innerHTML = events.map(e => `
+                <div class="event-item">
+                    <span class="ev-label">${e.label}</span>
+                    <span class="ev-score">${((e.data?.top_score || 0) * 100).toFixed(0)}%</span>
+                    <span class="ev-cam">${e.camera}</span>
+                    <span class="ev-time">${new Date(e.start_time * 1000).toLocaleTimeString()}</span>
+                </div>`).join('');
+        } catch (err) {
+            document.getElementById('events-list').innerHTML = '<span class="no-events">Frigate unavailable</span>';
         }
+    }
 
-        function startMSE() {
-            if (!window.MediaSource) { switchFeed('detect'); return; }
-            stopMSE();
-
-            mseSource = new MediaSource();
-            feedVideo.src = URL.createObjectURL(mseSource);
-
-            // Step 1: wait for MediaSource to open
-            mseSource.addEventListener('sourceopen', () => {
-                // Step 2: open WebSocket and immediately send codec request on open
-                const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-                mseWs = new WebSocket(`${proto}://${location.host}/ws/go2rtc?src=front-west`);
-                mseWs.binaryType = 'arraybuffer';
-
-                mseWs.onopen = () => {
-                    // Step 3: initiate go2rtc MSE stream
-                    mseWs.send(JSON.stringify({ type: 'mse', value: ['video/mp4'] }));
-                };
-
-                mseWs.onmessage = (ev) => {
-                    if (typeof ev.data === 'string') {
-                        // Step 4: go2rtc replies with codec string — create SourceBuffer
-                        const msg = JSON.parse(ev.data);
-                        if (msg.type === 'mse' && !mseBuffer) {
-                            try {
-                                mseBuffer = mseSource.addSourceBuffer(msg.value);
-                                mseBuffer.mode = 'segments';
-                                mseBuffer.addEventListener('updateend', () => {
-                                    mseAppending = false;
-                                    drainQueue();
-                                    // Resume play if it was deferred or interrupted
-                                    if (feedVideo.paused) feedVideo.play().catch(() => {});
-                                });
-                            } catch(e) {
-                                console.error('MSE addSourceBuffer failed:', msg.value, e);
-                                stopMSE();
-                                switchFeed('detect');
-                            }
-                        }
-                    } else {
-                        // Step 5: binary MP4 fragments — queue and append
-                        mseQueue.push(ev.data);
-                        if (mseQueue.length > 50) mseQueue.shift();
-                        drainQueue();
-                        // Start playing on first data if still paused
-                        if (mseBuffer && feedVideo.paused) feedVideo.play().catch(() => {});
-                    }
-                };
-
-                mseWs.onclose = () => { setTimeout(startMSE, 2000); };
-                mseWs.onerror = (e) => { console.error('MSE WS error', e); stopMSE(); switchFeed('detect'); };
-            }, { once: true });
-        }
-
-        function drainQueue() {
-            if (!mseBuffer || mseAppending || mseBuffer.updating || mseQueue.length === 0) return;
-            mseAppending = true;
-            try { mseBuffer.appendBuffer(mseQueue.shift()); }
-            catch(e) { mseAppending = false; }
-        }
-
-        function switchFeed(mode) {
-            document.getElementById('btn-live').classList.toggle('active', mode === 'live');
-            document.getElementById('btn-detect').classList.toggle('active', mode === 'detect');
-
-            if (detectInterval) { clearInterval(detectInterval); detectInterval = null; }
-
-            if (mode === 'live') {
-                feedImg.style.display = 'none';
-                feedVideo.style.display = '';
-                startMSE();
-            } else {
-                stopMSE();
-                feedVideo.style.display = 'none';
-                feedImg.style.display = '';
-                feedImg.src = '/stream/front-west?' + Date.now();
-                detectInterval = setInterval(() => {
-                    feedImg.src = '/stream/front-west?' + Date.now();
-                }, 1000);
+    async function loadStats() {
+        try {
+            const resp = await fetch('/api/stats');
+            if (!resp.ok) return;
+            const s = await resp.json();
+            const w = s.cameras?.['front-west'];
+            const e = s.cameras?.['front-east'];
+            if (w) document.getElementById('fps-west').textContent = (w.detection_fps ?? '--');
+            if (e) document.getElementById('fps-east').textContent = (e.detection_fps ?? '--');
+            if (s.service?.uptime) {
+                const h = Math.floor(s.service.uptime / 3600);
+                const m = Math.floor((s.service.uptime % 3600) / 60);
+                document.getElementById('uptime').textContent = h > 0 ? h + 'h' : m + 'm';
             }
-        }
+        } catch (_) {}
+    }
 
-        async function loadEvents() {
-            try {
-                const resp = await fetch('/api/events?limit=20');
-                if (!resp.ok) throw new Error(resp.status);
-                const events = await resp.json();
-                const list = document.getElementById('events-list');
-                document.getElementById('stat-events').textContent = events.length;
-                if (!events.length) { list.innerHTML = '<div class="no-events">No events yet</div>'; return; }
-                list.innerHTML = events.map(e => `
-                    <div class="event-item">
-                        <div>
-                            <div class="event-label">${e.label} (${(e.data?.top_score * 100 || 0).toFixed(0)}%)</div>
-                            <div class="event-camera">${e.camera}</div>
-                        </div>
-                        <div class="event-time">${new Date(e.start_time * 1000).toLocaleTimeString()}</div>
-                    </div>
-                `).join('');
-            } catch (err) {
-                console.error('loadEvents:', err);
-                document.getElementById('events-list').innerHTML = '<div class="no-events">Frigate unavailable</div>';
+    async function loadUser() {
+        try {
+            const resp = await fetch('/auth/me');
+            const d = await resp.json();
+            if (d.authenticated) {
+                document.getElementById('user-name').textContent = d.user.name || d.user.email;
+                document.getElementById('user-info').style.display = 'inline';
             }
-        }
+        } catch (_) {}
+    }
 
-        async function loadStats() {
-            try {
-                const resp = await fetch('/api/stats');
-                if (!resp.ok) throw new Error(resp.status);
-                const stats = await resp.json();
-                const cam = stats.cameras?.front_door;
-                if (cam) {
-                    document.getElementById('stat-fps').textContent = cam.detection_fps?.toFixed(1) || '--';
-                }
-                const det = stats.detectors?.default;
-                if (det) {
-                    document.getElementById('stat-inference').textContent = det.inference_speed?.toFixed(1) || '--';
-                }
-                if (stats.service?.uptime) {
-                    const hrs = Math.floor(stats.service.uptime / 3600);
-                    const min = Math.floor((stats.service.uptime % 3600) / 60);
-                    document.getElementById('stat-uptime').textContent = hrs > 0 ? hrs + 'h' : min + 'm';
-                }
-            } catch (err) { console.error('loadStats:', err); }
-        }
-
-        async function loadUser() {
-            try {
-                const resp = await fetch('/auth/me');
-                const data = await resp.json();
-                if (data.authenticated) {
-                    document.getElementById('user-name').textContent = data.user.name || data.user.email;
-                    document.getElementById('user-info').style.display = 'inline';
-                }
-            } catch (err) {}
-        }
-
-        // Start with HD live feed
-        loadUser();
-        loadEvents();
-        loadStats();
-        switchFeed('live');
-        setInterval(loadEvents, 10000);
-        setInterval(loadStats, 5000);
-    </script>
+    loadUser();
+    loadEvents();
+    loadStats();
+    setInterval(loadEvents, 10000);
+    setInterval(loadStats, 5000);
+</script>
 </body>
 </html>
